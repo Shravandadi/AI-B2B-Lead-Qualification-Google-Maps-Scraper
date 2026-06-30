@@ -1,0 +1,382 @@
+{
+  "name": "AI Lead Generation Agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ccaa7245-f8bc-4de2-a00c-bae051323ef5",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5aa57e67-baf6-43db-8fcf-9d22f6d6a872",
+              "name": "city",
+              "value": "YOUR_TARGET_CITY",
+              "type": "string"
+            },
+            {
+              "id": "bb25835b-5ca6-47ca-866f-95d36b657ee5",
+              "name": "sector_keyword",
+              "value": "YOUR_SECTOR_KEYWORD",
+              "type": "string"
+            },
+            {
+              "id": "7c3c58bd-23a5-4ffa-b630-63c38c9a0639",
+              "name": "max_results",
+              "value": 50,
+              "type": "number"
+            },
+            {
+              "id": "5248430b-e87a-4205-8371-acd0ce54f89c",
+              "name": "country",
+              "value": "YOUR_COUNTRY",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "56aeb920-eb7e-411d-b5d1-4afb0a900424",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items?token=YOUR_APIFY_API_TOKEN",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"searchStringsArray\": [\"YOUR_SEARCH_QUERY\"],\n  \"maxCrawledPlacesPerSearch\": 25,\n  \"language\": \"YOUR_LANGUAGE_CODE\",\n  \"countryCode\": \"YOUR_COUNTRY_CODE\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "364ae1b3-e6e8-4561-8128-1cd3b31aa8b1",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of items) {\n  const dataArray = Array.isArray(item.json) ? item.json : [item.json];\n\n  for (const place of dataArray) {\n    if (!place || !place.title) continue;\n\n    results.push({\n      json: {\n        company_name: place.title || \"\",\n        city: place.city || \"\",\n        address: place.address || \"\",\n        phone: place.phone || place.phoneUnformatted || \"\",\n        website: place.website || \"\",\n        category: place.categoryName || \"\",\n        rating: place.totalScore || \"\",\n        reviews_count: place.reviewsCount || \"\"\n      }\n    });\n  }\n}\n\nreturn results.length > 0 ? results : [{ json: {} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "5cd685b2-e3f5-4a45-900e-760c380b4c10",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a B2B lead qualification assistant for YOUR_COMPANY_NAME — a company selling YOUR_PRODUCT_OR_SERVICE to YOUR_TARGET_INDUSTRY companies.\n\nCompany data:\nName: {{ $json.company_name }}\nCity: {{ $json.city }}\nCategory: {{ $json.category }}\nRating: {{ $json.rating }}\nWebsite: {{ $json.website }}\n\nReturn ONLY valid JSON with exactly these 3 fields:\n{\n  \"fit_score\": <number 1-5>,\n  \"fit_reason\": \"<one sentence explaining the score>\",\n  \"outreach_message\": \"<one sentence to open a conversation with the lead>\"\n}\n\nNo markdown. No explanation. JSON only.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        864,
+        0
+      ],
+      "id": "346c0b10-787c-4751-b034-802681ac54d2",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        896,
+        208
+      ],
+      "id": "8abedb08-318c-4d3a-9967-dfc5f9faac82",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "YOUR_MISTRAL_CREDENTIAL_ID",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  \n  // Pull original company data from Node 4\n  const company = $('Code in JavaScript').all()[i].json;\n  \n  // Parse AI JSON output\n  let raw = item.json.output;\n  raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();\n  const ai = JSON.parse(raw);\n  \n  results.push({\n    json: {\n      company_name: company.company_name || \"\",\n      city: company.city || \"\",\n      address: company.address || \"\",\n      phone: company.phone || \"\",\n      website: company.website || \"\",\n      category: company.category || \"\",\n      rating: company.rating || \"\",\n      reviews_count: company.reviews_count || \"\",\n      fit_score: ai.fit_score || \"\",\n      fit_reason: ai.fit_reason || \"\",\n      outreach_message: ai.outreach_message || \"\",\n      status: \"New\"\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        0
+      ],
+      "id": "9b33183f-43a7-4b94-b278-03c1a9e58195",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_URL",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "All Leads",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEETS_URL"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "company_name"
+          ],
+          "schema": [
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rating",
+              "displayName": "rating",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviews_count",
+              "displayName": "reviews_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fit_score",
+              "displayName": "fit_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fit_reason",
+              "displayName": "fit_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outreach_message",
+              "displayName": "outreach_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1424,
+        0
+      ],
+      "id": "44ad4b87-9098-436c-9481-3f05837679c8",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
