@@ -1,4 +1,4 @@
-# AI B2B Lead Qualification & Google Maps Scraper - N8N
+# AI B2B Lead Qualification & Google Maps Scraper
 
 An end-to-end automated lead generation pipeline that scrapes local businesses from Google Maps, qualifies each lead using AI, generates personalized outreach messages, and exports everything to Google Sheets — with zero manual effort.
 
