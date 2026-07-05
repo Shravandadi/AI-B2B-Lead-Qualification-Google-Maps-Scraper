@@ -105,10 +105,10 @@ For each business found on Google Maps, the workflow:
 ## Setup Guide
 
 ### Prerequisites
-- n8n running locally (`localhost:5678`) or on a cloud server
-- Apify account + API token ([get one here](https://console.apify.com/account/integrations))
-- Mistral AI API key ([get one here](https://console.mistral.ai/api-keys/))
-- Google account for Sheets OAuth2
+- n8n running on a cloud server
+- Apify account + API token 
+- Mistral AI API key 
+- Google account for Sheets 
 
 ### Step 1 — Import the Workflow
 1. Open n8n
